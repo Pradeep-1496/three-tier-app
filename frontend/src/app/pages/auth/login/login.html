@@ -1,0 +1,55 @@
+<div class="auth-card">
+  <!-- Header -->
+  <div class="auth-header">
+    <h1 class="auth-title">Welcome Back</h1>
+    <p class="auth-subtitle">Sign in to your account to continue</p>
+  </div>
+
+  <!-- Error Display -->
+  @if (errorMessage()) {
+    <div class="auth-error">{{ errorMessage() }}</div>
+  }
+
+  <!-- Login Form -->
+  <form [formGroup]="LoginForm" (ngSubmit)="login()" class="auth-form">
+    <div class="form-field">
+      <label for="email">Email Address</label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        class="form-input"
+        placeholder="Enter your email"
+        autocomplete="email"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        class="form-input"
+        placeholder="Enter your password"
+        autocomplete="current-password"
+      />
+    </div>
+
+    <button type="submit" class="auth-submit" [disabled]="LoginForm.invalid || isLoading()">
+      @if (isLoading()) {
+        <span>Signing in...</span>
+      } @else {
+        <span>Sign In</span>
+      }
+    </button>
+  </form>
+
+  <!-- Footer -->
+  <div class="auth-footer">
+    <p>
+      Don't have an account?
+      <a routerLink="/sign-up">Create one</a>
+    </p>
+  </div>
+</div>

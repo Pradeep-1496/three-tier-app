@@ -1,0 +1,67 @@
+<div class="auth-card">
+  <!-- Header -->
+  <div class="auth-header">
+    <h1 class="auth-title">Create Account</h1>
+    <p class="auth-subtitle">Get started with your free account</p>
+  </div>
+
+  <!-- Error Display -->
+  @if (errorMessage()) {
+    <div class="auth-error">{{ errorMessage() }}</div>
+  }
+
+  <!-- Register Form -->
+  <form [formGroup]="RegisterForm" (ngSubmit)="register()" class="auth-form">
+    <div class="form-field">
+      <label for="name">Full Name</label>
+      <input
+        id="name"
+        type="text"
+        formControlName="name"
+        class="form-input"
+        placeholder="Enter your full name"
+        autocomplete="name"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="email">Email Address</label>
+      <input
+        id="email"
+        type="email"
+        formControlName="email"
+        class="form-input"
+        placeholder="Enter your email"
+        autocomplete="email"
+      />
+    </div>
+
+    <div class="form-field">
+      <label for="password">Password</label>
+      <input
+        id="password"
+        type="password"
+        formControlName="password"
+        class="form-input"
+        placeholder="Create a password"
+        autocomplete="new-password"
+      />
+    </div>
+
+    <button type="submit" class="auth-submit" [disabled]="RegisterForm.invalid || isLoading()">
+      @if (isLoading()) {
+        <span>Creating account...</span>
+      } @else {
+        <span>Create Account</span>
+      }
+    </button>
+  </form>
+
+  <!-- Footer -->
+  <div class="auth-footer">
+    <p>
+      Already have an account?
+      <a routerLink="/login">Sign in</a>
+    </p>
+  </div>
+</div>

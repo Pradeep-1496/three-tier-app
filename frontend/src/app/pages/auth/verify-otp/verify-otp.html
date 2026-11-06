@@ -1,0 +1,23 @@
+<div class="auth-card">
+  <!-- Header -->
+  <div class="auth-header">
+    <h1 class="auth-title">Verify Account</h1>
+    <p class="auth-subtitle">
+      Code is successfully send on <strong> {{ currentEmail }} </strong>
+    </p>
+  </div>
+
+  <!-- OTP Form -->
+  <form class="auth-form" (ngSubmit)="onVerify(otpInput.value)">
+    <div class="form-field">
+      <label for="otp">OTP</label>
+      <input #otpInput id="otp" type="text" class="form-input" placeholder="Enter OTP here" />
+    </div>
+
+    <button type="submit" class="auth-submit" [disabled]="isLoading()">
+      {{ isLoading() ? 'Verifying...' : 'Verify' }}
+    </button>
+  </form>
+
+  <p class="error-text" *ngIf="errorMessage">{{ errorMessage() }}</p>
+</div>
