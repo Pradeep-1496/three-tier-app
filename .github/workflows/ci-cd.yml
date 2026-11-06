@@ -1,0 +1,158 @@
+
+name: Three Tier Application CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
+  EKS_NAMESPACE: ${{ vars.EKS_NAMESPACE }}
+
+jobs:
+
+  # -------------------------------
+  # JOB 1: CONTINUOUS INTEGRATION
+  # -------------------------------
+
+  test:
+    name: Test Frontend and Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Test Frontend
+        working-directory: ./frontend
+        run: npm run test --if-present
+
+      - name: Build Frontend
+        working-directory: ./frontend
+        run: npm run build --if-present
+
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Test Backend
+        working-directory: ./backend
+        run: npm run test --if-present
+
+      - name: Build Backend
+        working-directory: ./backend
+        run: npm run build --if-present
+
+  # -------------------------------
+  # JOB 2: BUILD AND PUSH TO ECR
+  # -------------------------------
+
+  build-and-push:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: test
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and Push Frontend Image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: ${{ vars.ECR_FRONTEND_REPO }}
+          IMAGE_TAG: ${{ github.sha }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_FRONTEND_REPO }}:${{ github.sha }}
+
+      - name: Build and Push Backend Image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_BACKEND_REPO }}:${{ github.sha }}
+
+  # -------------------------------
+  # JOB 3: DEPLOY TO AMAZON EKS
+  # -------------------------------
+
+  deploy:
+    name: Deploy to AWS EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure kubectl
+        run: |
+          aws eks update-kubeconfig \
+            --region "$AWS_REGION" \
+            --name "$EKS_CLUSTER_NAME"
+
+      - name: Apply Kubernetes Manifests
+        run: |
+          kubectl apply -f kubernetes/
+
+      - name: Update Frontend Deployment
+        run: |
+          kubectl set image deployment/frontend \
+            frontend=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_FRONTEND_REPO }}:${{ github.sha }} \
+            -n "$EKS_NAMESPACE"
+
+      - name: Update Backend Deployment
+        run: |
+          kubectl set image deployment/backend \
+            backend=${{ steps.login-ecr.outputs.registry }}/${{ vars.ECR_BACKEND_REPO }}:${{ github.sha }} \
+            -n "$EKS_NAMESPACE"
+
+      - name: Verify Frontend Deployment
+        run: |
+          kubectl rollout status deployment/frontend \
+            -n "$EKS_NAMESPACE" \
+            --timeout=180s
+
+      - name: Verify Backend Deployment
+        run: |
+          kubectl rollout status deployment/backend \
+            -n "$EKS_NAMESPACE" \
+            --timeout=180s
